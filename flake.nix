@@ -24,10 +24,21 @@
               SELECT ts AS "when", weight_grams::float / 1000 AS chonk FROM weight ORDER BY created_at, ts ASC LIMIT 20;
 
               WITH
-                one_week_ago AS (SELECT * FROM weight ORDER BY date_diff('hour', weight.ts, now()::timestamp - INTERVAL 7 DAY) DESC LIMIT 1)
-              SELECT 
-                printf('%.1f', avg(one_week_ago.weight_grams) / 1000) AS one_week_ago
-              FROM one_week_ago;
+                weeks AS (SELECT unnest(range(now()::timestamp - INTERVAL 1 MONTH, now()::timestamp, INTERVAL 5 DAY)) AS anchor)
+              SELECT
+                weeks.anchor::date AS date,
+                (
+                  SELECT printf('%.1f', avg(weight_grams) / 1000)
+                  FROM (
+                    SELECT weight.weight_grams FROM weight
+                    -- Take only a 5 day window around the date into account.
+                    WHERE @date_diff('day', weight.ts, weeks.anchor) < 5
+                    -- Take the 6 measurements closest to the anchor timestamp.
+                    ORDER BY @date_diff('hour', weight.ts, weeks.anchor) ASC
+                    LIMIT 6
+                  )
+                ) AS avg_weight
+              FROM weeks;
             EOF
           '';
           
