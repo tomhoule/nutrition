@@ -29,14 +29,11 @@
               SELECT
                 weeks.anchor::date AS date,
                 (
-                  SELECT printf('%.1f', avg(weight_grams) / 1000)
+                  SELECT printf('%.2f', avg(weight_grams) / 1000)
                   FROM (
                     SELECT weight.weight_grams FROM weight
                     -- Take only a 5 day window around the date into account.
                     WHERE @date_diff('day', weight.ts, weeks.anchor) < 5
-                    -- Take the 6 measurements closest to the anchor timestamp.
-                    ORDER BY @date_diff('hour', weight.ts, weeks.anchor) ASC
-                    LIMIT 6
                   )
                 ) AS avg_weight
               FROM weeks;
