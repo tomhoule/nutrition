@@ -21,7 +21,8 @@
 
           show = pkgs.writeShellScriptBin "show" ''
             ${prefix} << EOF
-              SELECT ts AS "when", weight_grams::float / 1000 AS chonk FROM weight ORDER BY created_at, ts ASC LIMIT 20;
+              WITH rows AS (SELECT ts AS "when", weight_grams::float / 1000 AS chonk, created_at FROM weight ORDER BY created_at DESC, ts ASC LIMIT 20)
+              SELECT "when", chonk FROM rows ORDER BY created_at ASC;
 
               WITH
                 weeks AS (SELECT unnest(range(now()::timestamp - INTERVAL 1 MONTH, now()::timestamp, INTERVAL 5 DAY)) AS anchor)
