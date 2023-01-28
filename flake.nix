@@ -25,27 +25,32 @@
               SELECT "when", chonk FROM rows ORDER BY created_at ASC;
 
               WITH
-                weeks AS (SELECT unnest(range(now()::timestamp - INTERVAL 33 DAY, now()::timestamp, INTERVAL 5 DAY)) AS anchor)
-              SELECT
-                weeks.anchor::date AS date,
-                (
+                windowed_weights AS (
                   SELECT
-                     printf('%.2f', regr_intercept(weight_grams, date_diff('minutes', ts, weeks.anchor)) / 1000),
-                  FROM (
-                    SELECT weight.weight_grams, weight.ts FROM weight
-                    -- Take only a 5 day window around the date into account.
-                    WHERE @date_diff('day', weight.ts, weeks.anchor) < 5
-                  )
-                ) AS avg_weight,
-              FROM weeks;
-
+                    *,
+                    first_value(ts) OVER bucket AS first_ts,
+                    last_value(ts) OVER bucket AS last_ts,
+                    (epoch(first_ts) + epoch(last_ts)) / 2 AS mid_bucket,
+                    regr_slope(weight_grams, epoch(ts) / (3600 * 24 * 7)) OVER (
+                      ORDER BY ts
+                      RANGE BETWEEN INTERVAL 8 DAYS PRECEDING
+                                AND INTERVAL 2 DAYS FOLLOWING
+                    ) AS rate,
+                  FROM weight
+                  WINDOW bucket AS (PARTITION BY date_diff('weeks', now()::timestamp, ts))
+                  ORDER BY ts ASC
+                )
               SELECT
+                to_timestamp(mid_bucket)::date AS date,
+                printf('%.2f', avg(weight_grams) / 1000) AS naive_avg_chonk,
                 printf(
                   '%.2f',
-                  regr_slope(weight_grams, epoch(ts) / (3600 * 24 * 7)) / 1000
-                ) AS weight_change_per_week_last_12_days
-              FROM weight
-              WHERE date_diff('day', ts, now()::TIMESTAMP) <= 12
+                  regr_intercept(weight_grams, epoch(ts) - mid_bucket) / 1000
+                ) AS avg_chonk,
+                printf('%+.2f', last(rate) / 1000) AS rate,
+              FROM windowed_weights
+              GROUP BY mid_bucket
+              HAVING avg_chonk IS NOT NULL;
             EOF
           '';
 
