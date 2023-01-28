@@ -23,7 +23,6 @@ WITH windowed_weights AS (
 )
 SELECT
     to_timestamp(mid_bucket)::date AS date,
-    printf('%.2f', avg(weight_grams) / 1000) AS naive_avg_chonk,
     printf(
       '%.2f',
       regr_intercept(weight_grams, epoch(ts) - mid_bucket) / 1000
