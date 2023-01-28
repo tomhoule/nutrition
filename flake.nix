@@ -38,9 +38,17 @@
                   )
                 ) AS avg_weight,
               FROM weeks;
+
+              SELECT
+                printf(
+                  '%.2f',
+                  regr_slope(weight_grams, epoch(ts) / (3600 * 24 * 7)) / 1000
+                ) AS weight_change_per_week_last_12_days
+              FROM weight
+              WHERE date_diff('day', ts, now()::TIMESTAMP) <= 12
             EOF
           '';
-          
+
           inherit duckdb;
         };
 
