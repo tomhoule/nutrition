@@ -1,12 +1,12 @@
 WITH rows AS (
-    SELECT ts AS "when", weight_grams::float / 1000 AS chonk, created_at
+    SELECT ts AS "when", weight_grams::float / 1000 AS weight, created_at
     FROM weight
     ORDER BY created_at DESC, ts ASC
     LIMIT 18
 )
-SELECT "when", chonk FROM rows ORDER BY created_at ASC;
+SELECT "when", weight FROM rows ORDER BY created_at ASC;
 
-WITH windowed_weights AS (
+WITH windowed_weight AS (
   SELECT
     *,
     first_value(ts) OVER bucket AS first_ts,
@@ -26,8 +26,8 @@ SELECT
     printf(
       '%.2f',
       regr_intercept(weight_grams, epoch(ts) - mid_bucket) / 1000
-    ) AS avg_chonk,
+    ) AS avg_weight,
     printf('%+.2f', last(rate) / 1000) AS rate,
-FROM windowed_weights
+FROM windowed_weight
 GROUP BY mid_bucket
-HAVING avg_chonk IS NOT NULL;
+HAVING avg_weight IS NOT NULL;
