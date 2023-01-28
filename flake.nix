@@ -25,17 +25,18 @@
               SELECT "when", chonk FROM rows ORDER BY created_at ASC;
 
               WITH
-                weeks AS (SELECT unnest(range(now()::timestamp - INTERVAL 1 MONTH, now()::timestamp, INTERVAL 5 DAY)) AS anchor)
+                weeks AS (SELECT unnest(range(now()::timestamp - INTERVAL 33 DAY, now()::timestamp, INTERVAL 5 DAY)) AS anchor)
               SELECT
                 weeks.anchor::date AS date,
                 (
-                  SELECT printf('%.2f', avg(weight_grams) / 1000)
+                  SELECT
+                     printf('%.2f', regr_intercept(weight_grams, date_diff('minutes', ts, weeks.anchor)) / 1000),
                   FROM (
-                    SELECT weight.weight_grams FROM weight
+                    SELECT weight.weight_grams, weight.ts FROM weight
                     -- Take only a 5 day window around the date into account.
                     WHERE @date_diff('day', weight.ts, weeks.anchor) < 5
                   )
-                ) AS avg_weight
+                ) AS avg_weight,
               FROM weeks;
             EOF
           '';
