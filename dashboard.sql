@@ -12,13 +12,15 @@ WITH windowed_weight AS (
     first_value(ts) OVER bucket AS first_ts,
     last_value(ts) OVER bucket AS last_ts,
     (epoch(first_ts) + epoch(last_ts)) / 2 AS mid_bucket,
-    regr_slope(weight_grams, epoch(ts) / (3600 * 24 * 7)) OVER (
+    regr_slope(weight_grams, epoch(ts) / (3600 * 24 * 7)) OVER rate_range AS rate,
+  FROM weight
+  WINDOW
+    bucket AS (PARTITION BY date_diff('weeks', now()::timestamp, ts)),
+    rate_range AS (
       ORDER BY ts
       RANGE BETWEEN INTERVAL 8 DAYS PRECEDING
                 AND INTERVAL 2 DAYS FOLLOWING
-    ) AS rate,
-  FROM weight
-  WINDOW bucket AS (PARTITION BY date_diff('weeks', now()::timestamp, ts))
+    )
   ORDER BY ts ASC
 )
 SELECT
