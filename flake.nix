@@ -21,7 +21,7 @@
 
           show = pkgs.writeShellScriptBin "show" ''
             ${prefix} << EOF
-              WITH rows AS (SELECT ts AS "when", weight_grams::float / 1000 AS chonk, created_at FROM weight ORDER BY created_at DESC, ts ASC LIMIT 20)
+              WITH rows AS (SELECT ts AS "when", weight_grams::float / 1000 AS chonk, created_at FROM weight ORDER BY created_at DESC, ts ASC LIMIT 18)
               SELECT "when", chonk FROM rows ORDER BY created_at ASC;
 
               WITH
