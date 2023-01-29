@@ -7,29 +7,43 @@ WITH rows AS (
 SELECT "when", weight FROM rows ORDER BY created_at ASC;
 
 WITH
-    bucketed_weight AS (
-        SELECT
-            *,
-            date_part('day', age(ts)) / 3 AS bucket, -- 2-day buckets
-            avg(weight_grams) OVER week AS naive_avg_weight,
-            avg(epoch(ts)) OVER week AS avg_ts,
-            regr_slope(weight_grams, epoch(ts)) OVER week AS raw_slope,
-            regr_slope(weight_grams, epoch(ts) / (3600 * 24 * 7)) OVER week AS rate,
-        FROM weight
-        WINDOW week AS (
-            ORDER BY ts
-            RANGE BETWEEN INTERVAL 3 DAYS PRECEDING
-                      AND INTERVAL 3 DAYS FOLLOWING
-        )
+weight_windows AS (
+    SELECT
+        *,
+        avg(weight_grams) OVER week AS naive_avg_weight,
+        avg(epoch(ts)) OVER week AS avg_ts,
+        regr_slope(weight_grams, epoch(ts)) OVER week AS raw_slope,
+        regr_slope(weight_grams, epoch(ts) / (3600 * 24 * 7)) OVER week AS rate,
+        count(*) OVER week AS measurements_count,
+    FROM weight
+    WINDOW week AS (
         ORDER BY ts
+        RANGE BETWEEN INTERVAL 3 DAYS PRECEDING
+                  AND INTERVAL 3 DAYS FOLLOWING
     )
+    ORDER BY ts
+),
+daily_weight_windows AS (
+    SELECT
+        first(ts) AS ts,
+        first(naive_avg_weight) AS naive_avg_weight,
+        first(measurements_count) AS measurements_count,
+        first(raw_slope) AS raw_slope,
+        first(rate) AS rate,
+        first(avg_ts) AS avg_ts,
+    FROM weight_windows
+    GROUP BY ts::DATE
+    ORDER BY ts
+)
 SELECT
-    first(ts)::date AS date,
-    printf('%.2f', first(naive_avg_weight) / 1000) AS naive_avg_weight,
+    ts::DATE AS date,
+    printf('%.2f', naive_avg_weight / 1000) AS naive_avg_weight,
     -- See the regression intercept formula at
     -- https://duckdb.org/docs/sql/aggregates#statistical-aggregates
-    printf('%.2f', (first(naive_avg_weight) - first(raw_slope) * (first(avg_ts) - first(epoch(ts)))) / 1000) AS regression_intercept,
-    printf('%+.2f', coalesce(first(rate) / 1000, 0)) AS weekly_rate,
-FROM bucketed_weight
-GROUP BY bucket
-ORDER BY bucket DESC
+    printf('%.2f', (naive_avg_weight - raw_slope * (avg_ts - epoch(ts))) / 1000) AS regression_intercept,
+    printf('%+.2f', coalesce(rate / 1000, 0)) AS weekly_rate,
+FROM daily_weight_windows
+WHERE ts > now() - INTERVAL 2 MONTHS
+  AND ts < now() - INTERVAL 3 DAYS
+  AND measurements_count > 4
+ORDER BY ts
