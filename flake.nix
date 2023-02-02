@@ -19,7 +19,7 @@
             ${prefix} "INSERT INTO weight (ts, weight_grams) VALUES ('$1', $2)"
           '';
 
-          show = pkgs.writeShellScriptBin "show" "${prefix} < ${./dashboard.sql}";
+          show = pkgs.writeShellScriptBin "show" "cat ${./last_measurements.sql} ${./dashboard.sql} | ${prefix}";
 
           inherit duckdb;
         };
