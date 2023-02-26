@@ -1,40 +1,35 @@
 WITH
-weight_windows AS (
+daily_weight AS (
+    SELECT first(ts::DATE) AS date, avg(weight_grams) AS daily_avg_weight,
+    FROM weight
+    GROUP BY ts::DATE
+    ORDER BY ts::DATE
+),
+with_recent_weight AS (
     SELECT
         *,
-        avg(weight_grams) OVER week AS naive_avg_weight,
-        regr_slope(weight_grams, epoch(ts)) OVER week AS slope,
-        count(*) OVER week AS measurements_count,
-        last(ts) OVER week AS last_ts,
-        avg(epoch(ts)) OVER week AS avg_ts,
-    FROM weight
-    WINDOW week AS (
-        ORDER BY ts
-        RANGE BETWEEN INTERVAL 9 DAYS PRECEDING
-                  AND CURRENT ROW
-    )
-    ORDER BY ts
+        avg(daily_avg_weight)
+            OVER (
+                ORDER BY date
+                RANGE BETWEEN INTERVAL 13 DAYS PRECEDING
+                          AND CURRENT ROW
+            )
+            AS recent_avg_weight,
+    FROM daily_weight
 ),
-daily_weight_windows AS (
+with_slope AS (
     SELECT
-        first(ts) AS ts,
-        first(naive_avg_weight) AS naive_avg_weight,
-        first(measurements_count) AS measurements_count,
-        first(slope) AS slope,
-        first(last_ts) AS last_ts,
-        first(avg_ts) AS avg_ts,
-    FROM weight_windows
-    GROUP BY ts::DATE
-    ORDER BY ts
+        *,
+        recent_avg_weight - lag(recent_avg_weight)
+            OVER (ORDER BY date)
+            AS estimated_weekly_slope,
+    FROM with_recent_weight
 )
 SELECT
-    ts::DATE AS date,
-    printf('%.2f', naive_avg_weight / 1000) AS naive_avg_weight,
-    -- See the regression intercept formula at
-    -- https://duckdb.org/docs/sql/aggregates#statistical-aggregates
-    printf('%.2f', (naive_avg_weight - (slope * (avg_ts - epoch(last_ts)))) / 1000) AS approx_weight,
-    printf('%+.2f', coalesce(slope * 3600 * 24 * 7 / 1000, 0)) AS weekly_rate,
-FROM daily_weight_windows
-WHERE ts > now() - INTERVAL 2 MONTHS
-  AND measurements_count > 4
-ORDER BY ts
+    date,
+    printf('%.2f', daily_avg_weight / 1000) AS daily_avg_weight,
+    printf('%.2f', recent_avg_weight / 1000) AS recent_avg_weight,
+    printf('%+.2f', (estimated_weekly_slope * 7) / 1000) AS estimated_weekly_slope,
+FROM with_slope
+WHERE date > today() - INTERVAL 35 DAYS
+ORDER BY date ASC
