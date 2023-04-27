@@ -15,7 +15,11 @@
         {
           opendb = pkgs.writeShellScriptBin "opendb" prefix;
 
-          recordWeight = pkgs.writeShellScriptBin "opendb" ''
+          recordWaist = pkgs.writeShellScriptBin "recordWaist" ''
+            ${prefix} "INSERT INTO waist (ts, waist_mm) VALUES ('$1', $2)"
+          '';
+
+          recordWeight = pkgs.writeShellScriptBin "recordWeight" ''
             ${prefix} "INSERT INTO weight (ts, weight_grams) VALUES ('$1', $2)"
           '';
 
