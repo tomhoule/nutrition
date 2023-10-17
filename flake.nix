@@ -1,5 +1,5 @@
 {
-  description = "A very basic flake";
+  description = "Nutrition tracking for my personal needs.";
 
   outputs = { self, nixpkgs }:
     let
@@ -10,16 +10,24 @@
     {
       packages."${system}" =
         let
-          prefix = "${duckdb}/bin/duckdb nutrition.db";
+          withDb = "${duckdb}/bin/duckdb -init ${./import_database.sql}";
         in
         {
-          opendb = pkgs.writeShellScriptBin "opendb" prefix;
+          opendb = pkgs.writeShellScriptBin "opendb" withDb;
 
           recordWeight = pkgs.writeShellScriptBin "recordWeight" ''
-            ${prefix} "INSERT INTO weight (ts, weight_grams) VALUES ('$1', $2)"
+            echo \
+              "INSERT INTO weight (date, weight_grams) VALUES ($1, $2);"\
+              "EXPORT DATABASE 'db' (FORMAT PARQUET)"\
+            | ${withDb}
           '';
 
-          show = pkgs.writeShellScriptBin "show" "cat ${./last_measurements.sql} ${./dashboard.sql} | ${prefix}";
+          show = pkgs.writeShellScriptBin "show" ''
+            cat \
+              ${./last_measurements.sql}\
+              ${./dashboard.sql}\
+            | ${withDb}
+          '';
 
           inherit duckdb;
         };

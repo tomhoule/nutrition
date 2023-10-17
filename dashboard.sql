@@ -1,8 +1,8 @@
 WITH
 daily_weight AS (
-    SELECT first(ts::DATE) AS date, avg(weight_grams) AS daily_avg_weight,
+    SELECT date, avg(weight_grams) AS daily_avg_weight,
     FROM weight
-    GROUP BY ts::DATE
+    GROUP BY date
 ),
 with_recent_weight AS (
     SELECT
