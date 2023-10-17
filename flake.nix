@@ -24,6 +24,7 @@
 
           show = pkgs.writeShellScriptBin "show" ''
             cat \
+              ${./measurements_count.sql}\
               ${./last_measurements.sql}\
               ${./dashboard.sql}\
             | ${withDb}
