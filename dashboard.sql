@@ -10,7 +10,7 @@ with_recent_weight AS (
         avg(daily_avg_weight)
             OVER (
                 ORDER BY date
-                RANGE BETWEEN INTERVAL 10 DAYS PRECEDING
+                RANGE BETWEEN INTERVAL 9 DAYS PRECEDING
                           AND CURRENT ROW
             )
             AS recent_avg_weight,
